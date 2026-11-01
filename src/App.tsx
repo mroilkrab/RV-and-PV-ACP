@@ -162,10 +162,16 @@ export default function App() {
               setCustomers(cloudCustomers);
               saveCustomers(cloudCustomers);
             } else {
-              // Seed cloud with local default customers if cloud is empty
-              const localCusts = getStoredCustomers();
-              if (localCusts && localCusts.length > 0) {
-                pushAllCustomersToFirebase(localCusts).catch(() => {});
+              const isCleared = localStorage.getItem('account_planet_customers_cleared') === 'true';
+              if (isCleared) {
+                setCustomers([]);
+                saveCustomers([]);
+              } else {
+                // Initial setup: seed cloud with local default customers if cloud is empty
+                const localCusts = getStoredCustomers();
+                if (localCusts && localCusts.length > 0) {
+                  pushAllCustomersToFirebase(localCusts).catch(() => {});
+                }
               }
             }
           },

@@ -39,6 +39,10 @@ import {
   downloadCustomersAsJson,
   pushAllCustomersToFirebase,
   reloadAcpMasterCustomers,
+  clearStoredCustomers,
+  clearAllCustomersFromFirebase,
+  saveCustomers,
+  saveCustomerSheetConfig,
 } from '../utils/customerSync';
 import * as XLSX from 'xlsx';
 
@@ -119,12 +123,22 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
     });
   }, [customers, searchQuery]);
 
-  // Handle Sync from Google Sheets
-  const handleSyncSheet = async () => {
-    const targetUrl = sheetUrlInput.trim() || customerSheetConfig.sheetUrl;
+  // Handle Sync from Google Sheets (Supports both Replace and Merge)
+  const handleSyncSheet = async (forcedMode?: 'replace' | 'merge' | any) => {
+    const targetUrl = (sheetUrlInput || customerSheetConfig.sheetUrl || '').trim();
     if (!targetUrl) {
+      setShowSheetSettings(true);
       setSyncMessage({ text: 'กรุณาระบุลิงก์ Google Sheets ก่อนซิงค์', type: 'error' });
       return;
+    }
+
+    const isSpecificMode = forcedMode === 'replace' || forcedMode === 'merge';
+    let mode: 'replace' | 'merge' = isSpecificMode ? forcedMode : 'replace';
+    if (!isSpecificMode && customers.length > 0) {
+      const userChoice = window.confirm(
+        `พบข้อมูลลูกค้าเดิมในระบบ ${customers.length} บริษัท\n\n- กด [ตกลง (OK)] เพื่อ "ลบข้อมูลเดิมแล้วแทนที่ด้วยข้อมูลจาก Google Sheets ชุดนี้ทั้งหมด"\n- กด [ยกเลิก (Cancel)] เพื่อ "รวมข้อมูล (Merge)" เพิ่มเติมเข้ากับของเดิม`
+      );
+      mode = userChoice ? 'replace' : 'merge';
     }
 
     setIsSyncing(true);
@@ -132,18 +146,34 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
 
     try {
       const result = await fetchLiveGoogleSheetCustomers(targetUrl);
-      if (result.success && result.customers) {
-        const merged = mergeCustomers(customers, result.customers);
-        onUpdateCustomers(merged);
-        onUpdateSheetConfig({
+      if (result.success && result.customers && result.customers.length > 0) {
+        let finalCustomers: Customer[];
+        if (mode === 'replace' || customers.length === 0) {
+          finalCustomers = result.customers;
+          await clearAllCustomersFromFirebase().catch(() => {});
+        } else {
+          finalCustomers = mergeCustomers(customers, result.customers);
+        }
+
+        onUpdateCustomers(finalCustomers);
+        saveCustomers(finalCustomers);
+        pushAllCustomersToFirebase(finalCustomers).catch(() => {});
+
+        const updatedConfig = {
           ...customerSheetConfig,
           sheetUrl: targetUrl,
           lastSyncedAt: new Date().toISOString(),
-          status: 'success',
+          status: 'success' as const,
           statusMessage: `ซิงค์สำเร็จ ${result.count} บริษัท`,
-        });
+        };
+        onUpdateSheetConfig(updatedConfig);
+        saveCustomerSheetConfig(updatedConfig);
+
         setSyncMessage({
-          text: `ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! เพิ่ม/อัปเดต ${result.count} รายการ (รวมทั้งสิ้น ${merged.length} บริษัท)`,
+          text:
+            mode === 'replace'
+              ? `✓ ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! แทนที่ด้วยข้อมูลใหม่ทั้งหมด ${result.count} บริษัท`
+              : `✓ ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! เพิ่ม/อัปเดต ${result.count} รายการ (รวมทั้งสิ้น ${finalCustomers.length} บริษัท)`,
           type: 'success',
         });
       } else {
@@ -156,6 +186,30 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
       setSyncMessage({ text: 'เกิดข้อผิดพลาด: ' + (e.message || 'ไม่ทราบสาเหตุ'), type: 'error' });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Clear all sample / customer data
+  const handleClearAllCustomers = async () => {
+    if (
+      window.confirm(
+        `คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลรายชื่อลูกค้าตัวอย่างทั้งหมด (${customers.length} บริษัท) ออกจากระบบ?\n\nเมื่อลบแล้วระบบจะว่างเปล่า เพื่อให้คุณสามารถดึงข้อมูลจริงจาก Google Sheets ได้โดยตรง`
+      )
+    ) {
+      clearStoredCustomers();
+      onUpdateCustomers([]);
+      await clearAllCustomersFromFirebase().catch(() => {});
+      setSyncMessage({ text: 'ลบข้อมูลตัวอย่างเดิมทั้งหมดเรียบร้อยแล้ว พร้อมดึงข้อมูลจาก Google Sheets', type: 'info' });
+    }
+  };
+
+  // Reload Authentic 208 ACP Master list
+  const handleReloadMaster = async () => {
+    if (confirm('คุณต้องการโหลดฐานข้อมูลตั้งต้นของลูกค้า ACP ทั้งหมด 208 บริษัทกลับมาใช่หรือไม่?')) {
+      const reloaded = reloadAcpMasterCustomers();
+      onUpdateCustomers(reloaded);
+      await pushAllCustomersToFirebase(reloaded).catch(() => {});
+      setSyncMessage({ text: `โหลดฐานข้อมูลตั้งต้นลูกค้า ACP ทั้งหมด ${reloaded.length} บริษัทกลับมาเรียบร้อยแล้ว!`, type: 'success' });
     }
   };
 
@@ -294,17 +348,7 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
     }
   };
 
-  // Restore authentic ACP Master 208 companies
-  const handleReloadMaster = () => {
-    if (confirm('คุณต้องการโหลดฐานข้อมูลตั้งต้นของลูกค้า ACP ทั้งหมด 208 บริษัทกลับมาใช่หรือไม่?')) {
-      const reloaded = reloadAcpMasterCustomers();
-      onUpdateCustomers(reloaded);
-      setSyncMessage({
-        text: `โหลดฐานข้อมูลตั้งต้นลูกค้า ACP ทั้งหมด ${reloaded.length} บริษัทกลับมาเรียบร้อยแล้ว!`,
-        type: 'success',
-      });
-    }
-  };
+
 
   // Import from Excel/CSV file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -579,6 +623,18 @@ export const CustomerDirectoryModal: React.FC<CustomerDirectoryModalProps> = ({
                 className="hidden"
               />
             </label>
+
+            {/* Clear All Customer / Sample Data Button */}
+            <button
+              type="button"
+              onClick={handleClearAllCustomers}
+              disabled={customers.length === 0}
+              className="flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs px-2.5 py-2 rounded-xl transition cursor-pointer font-medium disabled:opacity-40"
+              title="ลบรายชื่อลูกค้าและนิติบุคคลตัวอย่างเดิมทั้งหมดในระบบ เพื่อเตรียมดึงข้อมูลจริงจาก Google Sheets"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>ลบตัวอย่างเดิม</span>
+            </button>
 
             {/* Reload Original 208 Master Button */}
             <button

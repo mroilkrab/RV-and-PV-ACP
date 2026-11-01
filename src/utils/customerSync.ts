@@ -27,29 +27,30 @@ export const DEFAULT_CUSTOMER_SHEET_CONFIG: CustomerSheetSyncConfig = {
   statusMessage: 'พร้อมดึงข้อมูลรายชื่อลูกค้าจาก Google Sheets (208 บริษัทในฐานข้อมูลหลัก)',
 };
 
+export const CUSTOMER_CLEARED_FLAG = 'account_planet_customers_cleared';
+
 /**
  * Get stored customers from LocalStorage
- * Automatically merges/upgrades to the full 208 ACP Master list if local storage only has legacy placeholder data
+ * If the user has explicitly cleared sample customers, returns empty array or user's custom customers.
+ * Only falls back to default 208 ACP master on initial setup.
  */
 export function getStoredCustomers(): Customer[] {
   try {
+    const isCleared = localStorage.getItem(CUSTOMER_CLEARED_FLAG) === 'true';
     const raw = localStorage.getItem(CUSTOMER_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // If stored data has fewer than 100 entries, merge with the full 208 ACP master list
-        if (parsed.length < 100) {
-          const merged = mergeCustomers(ACP_CUSTOMERS_MASTER_LIST, parsed);
-          saveCustomers(merged);
-          return merged;
-        }
+      if (Array.isArray(parsed)) {
         return parsed;
       }
+    }
+    if (isCleared) {
+      return [];
     }
   } catch (e) {
     console.warn('[CustomerSync] Failed to read stored customers:', e);
   }
-  // Default to the full 208 ACP Master list
+  // Default on first installation only
   saveCustomers(DEFAULT_CUSTOMERS);
   return DEFAULT_CUSTOMERS;
 }
@@ -60,8 +61,23 @@ export function getStoredCustomers(): Customer[] {
 export function saveCustomers(customers: Customer[]): void {
   try {
     localStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify(customers));
+    if (customers.length > 0) {
+      localStorage.removeItem(CUSTOMER_CLEARED_FLAG);
+    }
   } catch (e) {
     console.warn('[CustomerSync] Failed to save customers to localStorage:', e);
+  }
+}
+
+/**
+ * Clear all customers from LocalStorage and set cleared flag
+ */
+export function clearStoredCustomers(): void {
+  try {
+    localStorage.setItem(CUSTOMER_CLEARED_FLAG, 'true');
+    localStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify([]));
+  } catch (e) {
+    console.warn('[CustomerSync] Failed to clear customers from localStorage:', e);
   }
 }
 
@@ -69,6 +85,9 @@ export function saveCustomers(customers: Customer[]): void {
  * Reset/Reload the full original 208 ACP Master customer list
  */
 export function reloadAcpMasterCustomers(): Customer[] {
+  try {
+    localStorage.removeItem(CUSTOMER_CLEARED_FLAG);
+  } catch {}
   const list = [...ACP_CUSTOMERS_MASTER_LIST];
   saveCustomers(list);
   return list;
@@ -584,6 +603,28 @@ export async function deleteCustomerFromFirebase(customerId: string): Promise<bo
     return true;
   } catch (error) {
     console.error('[Firebase] Failed to delete customer:', error);
+    return false;
+  }
+}
+
+/**
+ * Delete all customer documents from Firebase Firestore collection
+ */
+export async function clearAllCustomersFromFirebase(): Promise<boolean> {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'customers'));
+    const BATCH_SIZE = 400;
+    const docs = querySnapshot.docs;
+
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    return true;
+  } catch (error) {
+    console.error('[Firebase] Failed to clear customers collection:', error);
     return false;
   }
 }

@@ -43,6 +43,10 @@ import {
   downloadCustomersAsJson,
   pushAllCustomersToFirebase,
   reloadAcpMasterCustomers,
+  clearStoredCustomers,
+  clearAllCustomersFromFirebase,
+  saveCustomers,
+  saveCustomerSheetConfig,
 } from '../utils/customerSync';
 import * as XLSX from 'xlsx';
 
@@ -189,12 +193,22 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
     setTimeout(() => setCopiedFullInfoId(null), 2500);
   };
 
-  // Sync from Google Sheets
-  const handleSyncSheet = async () => {
-    const targetUrl = sheetUrlInput.trim() || customerSheetConfig.sheetUrl;
+  // Sync from Google Sheets (Supports both Replace All and Merge)
+  const handleSyncSheet = async (forcedMode?: 'replace' | 'merge' | any) => {
+    const targetUrl = (sheetUrlInput || customerSheetConfig.sheetUrl || '').trim();
     if (!targetUrl) {
-      notify('กรุณาระบุลิงก์ Google Sheets ก่อนซิงค์', 'error');
+      setShowSheetSettings(true);
+      notify('กรุณาระบุลิงก์ Google Sheets ก่อนดำเนินการดึงข้อมูล', 'error');
       return;
+    }
+
+    const isSpecificMode = forcedMode === 'replace' || forcedMode === 'merge';
+    let mode: 'replace' | 'merge' = isSpecificMode ? forcedMode : 'replace';
+    if (!isSpecificMode && customers.length > 0) {
+      const userChoice = window.confirm(
+        `พบข้อมูลลูกค้าเดิมในระบบ ${customers.length} บริษัท\n\n- กด [ตกลง (OK)] เพื่อ "ลบข้อมูลเดิมแล้วแทนที่ด้วยข้อมูลจาก Google Sheets ชุดนี้ทั้งหมด"\n- กด [ยกเลิก (Cancel)] เพื่อ "รวมข้อมูล (Merge)" เพิ่มเติมเข้ากับของเดิม`
+      );
+      mode = userChoice ? 'replace' : 'merge';
     }
 
     setIsSyncing(true);
@@ -203,17 +217,34 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
     try {
       const result = await fetchLiveGoogleSheetCustomers(targetUrl);
       if (result.success && result.customers && result.customers.length > 0) {
-        const merged = mergeCustomers(customers, result.customers);
-        onUpdateCustomers(merged);
-        onUpdateSheetConfig({
+        let finalCustomers: Customer[];
+        if (mode === 'replace' || customers.length === 0) {
+          finalCustomers = result.customers;
+          // Clear old cloud records first if replacing all
+          await clearAllCustomersFromFirebase().catch(() => {});
+        } else {
+          finalCustomers = mergeCustomers(customers, result.customers);
+        }
+
+        // Save locally and push to Cloud
+        onUpdateCustomers(finalCustomers);
+        saveCustomers(finalCustomers);
+        pushAllCustomersToFirebase(finalCustomers).catch(() => {});
+
+        const updatedConfig: CustomerSheetSyncConfig = {
           ...customerSheetConfig,
           sheetUrl: targetUrl,
           lastSyncedAt: new Date().toISOString(),
           status: 'success',
           statusMessage: `ซิงค์สำเร็จ ${result.count} บริษัท`,
-        });
+        };
+        onUpdateSheetConfig(updatedConfig);
+        saveCustomerSheetConfig(updatedConfig);
+
         notify(
-          `ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! อัปเดต ${result.count} รายการ (รวมทั้งสิ้น ${merged.length} บริษัทในระบบ)`,
+          mode === 'replace'
+            ? `✓ ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! แทนที่ด้วยข้อมูลใหม่ทั้งหมด ${result.count} บริษัท`
+            : `✓ ดึงข้อมูลลูกค้าจาก Google Sheets สำเร็จ! อัปเดต ${result.count} รายการ (รวมทั้งสิ้น ${finalCustomers.length} บริษัทในระบบ)`,
           'success'
         );
       } else {
@@ -227,6 +258,20 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
       notify('เกิดข้อผิดพลาดในการดึงข้อมูล: ' + (e.message || 'ไม่ทราบสาเหตุ'), 'error');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Clear all sample / customer data
+  const handleClearAllCustomers = async () => {
+    if (
+      window.confirm(
+        `คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลรายชื่อลูกค้าและนิติบุคคลตัวอย่างทั้งหมด (${customers.length} บริษัท) ออกจากระบบ?\n\nเมื่อลบแล้วระบบจะว่างเปล่า เพื่อให้คุณสามารถดึงข้อมูลจริงจาก Google Sheets ได้โดยไม่มีข้อมูลตัวอย่างปะปน (สามารถกดปุ่มโหลดข้อมูลตัวอย่างกลับมาได้ทุกเมื่อ)`
+      )
+    ) {
+      clearStoredCustomers();
+      onUpdateCustomers([]);
+      await clearAllCustomersFromFirebase().catch(() => {});
+      notify('ลบข้อมูลรายชื่อลูกค้าตัวอย่างเดิมทั้งหมดเรียบร้อยแล้ว ระบบพร้อมให้อัปเดตข้อมูลจริงจาก Google Sheets', 'info');
     }
   };
 
@@ -252,10 +297,11 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
   };
 
   // Reload Authentic 208 ACP Master list
-  const handleReloadMaster = () => {
+  const handleReloadMaster = async () => {
     if (confirm('คุณต้องการโหลดฐานข้อมูลตั้งต้นของลูกค้า ACP ทั้งหมด 208 บริษัทกลับมาใช่หรือไม่?')) {
       const reloaded = reloadAcpMasterCustomers();
       onUpdateCustomers(reloaded);
+      await pushAllCustomersToFirebase(reloaded).catch(() => {});
       notify(`โหลดฐานข้อมูลตั้งต้นลูกค้า ACP ทั้งหมด ${reloaded.length} บริษัทกลับมาเรียบร้อยแล้ว!`, 'success');
     }
   };
@@ -679,6 +725,18 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
               />
             </label>
 
+            {/* Clear All Customer / Sample Data Button */}
+            <button
+              type="button"
+              onClick={handleClearAllCustomers}
+              disabled={customers.length === 0}
+              className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs px-3 py-2 rounded-xl transition cursor-pointer font-medium disabled:opacity-40"
+              title="ลบรายชื่อลูกค้าและนิติบุคคลตัวอย่างเดิมทั้งหมดในระบบ เพื่อเตรียมดึงข้อมูลจริงจาก Google Sheets"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>ลบข้อมูลตัวอย่างเดิมทั้งหมด</span>
+            </button>
+
             {/* Reload Original 208 Master Button */}
             <button
               type="button"
@@ -687,7 +745,7 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
               title="โหลดรายชื่อลูกค้า ACP ทั้งหมด 208 บริษัทจากฐานข้อมูลหลัก"
             >
               <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-              <span>โหลดฐานข้อมูล ACP (208 บริษัท)</span>
+              <span>โหลดตัวอย่าง (208 บริษัท)</span>
             </button>
 
             {/* Layout Toggle (Cards vs Table) */}
@@ -788,33 +846,68 @@ export const CustomerDirectoryView: React.FC<CustomerDirectoryViewProps> = ({
 
       {/* Customers List Render */}
       {filteredCustomers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
-          <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="font-bold text-slate-800 text-base">ไม่พบรายชื่อลูกค้าที่ตรงกับเงื่อนไข</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            ลองปรับเปลี่ยนคำค้นหา หรือคลิกปุ่มด้านล่างเพื่อโหลดฐานข้อมูลตั้งต้นของลูกค้า ACP ทั้งหมด 208 บริษัท
-          </p>
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedStaffFilter('all');
-              }}
-              className="text-xs text-blue-600 underline font-medium cursor-pointer"
-            >
-              ล้างตัวกรองทั้งหมด
-            </button>
-            <span className="text-slate-300">|</span>
-            <button
-              type="button"
-              onClick={handleReloadMaster}
-              className="text-xs text-emerald-700 font-bold underline cursor-pointer"
-            >
-              โหลดฐานข้อมูล ACP (208 บริษัท)
-            </button>
+        customers.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 sm:p-16 text-center space-y-4 shadow-2xs">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+              <Building2 className="w-8 h-8" />
+            </div>
+            <div className="max-w-md mx-auto">
+              <h3 className="font-bold text-slate-900 text-lg font-prompt">
+                ระบบว่างเปล่า พร้อมดึงข้อมูลจาก Google Sheets
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                ข้อมูลตัวอย่างเดิมถูกลบออกเรียบร้อยแล้ว คุณสามารถดึงข้อมูลรายชื่อลูกค้าจริงจาก Google Sheets หรือนำเข้าไฟล์ Excel/CSV หรือเพิ่มรายชื่อลูกค้ารายใหม่ได้ทันที
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => handleSyncSheet('replace')}
+                disabled={isSyncing}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>ดึงข้อมูลจาก Google Sheets ทันที</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenAdd}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xs transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ เพิ่มลูกค้ารายใหม่</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleReloadMaster}
+                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3.5 py-2.5 rounded-xl transition cursor-pointer border border-slate-200"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                <span>โหลดข้อมูลตัวอย่าง (208 บริษัท) กลับมา</span>
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+            <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="font-bold text-slate-800 text-base">ไม่พบรายชื่อลูกค้าที่ตรงกับเงื่อนไขการค้นหา</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              ลองปรับเปลี่ยนคำค้นหา หรือคลิกล้างตัวกรองเพื่อดูรายชื่อทั้งหมด ({customers.length} บริษัท)
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedStaffFilter('all');
+                }}
+                className="text-xs text-blue-600 underline font-medium cursor-pointer"
+              >
+                ล้างคำค้นหาและตัวกรองทั้งหมด
+              </button>
+            </div>
+          </div>
+        )
       ) : viewMode === 'cards' ? (
         /* CARDS GRID VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

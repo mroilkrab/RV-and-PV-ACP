@@ -183,22 +183,32 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
     setTimeout(() => setCustomerSyncNotice(null), 4000);
   };
 
-  const handleQuickSyncCustomerSheet = async () => {
+  const handleQuickSyncCustomerSheet = async (forcedMode?: 'replace' | 'merge' | any) => {
     const targetUrl = companySettings.customerSheetUrl || sheetConfigState.sheetUrl;
     if (!targetUrl) {
       setIsCustomerModalOpen(true);
       return;
     }
+
+    const isSpecificMode = forcedMode === 'replace' || forcedMode === 'merge';
+    let mode: 'replace' | 'merge' = isSpecificMode ? forcedMode : 'replace';
+    if (!isSpecificMode && customerList.length > 0) {
+      const choice = window.confirm(
+        `พบข้อมูลลูกค้าในระบบ ${customerList.length} บริษัท\n\n- กด [ตกลง (OK)] เพื่อแทนที่ด้วยข้อมูลจาก Google Sheets ทั้งหมด\n- กด [ยกเลิก (Cancel)] เพื่อรวมข้อมูล (Merge) เพิ่มเติม`
+      );
+      mode = choice ? 'replace' : 'merge';
+    }
+
     setIsSyncingCustomers(true);
     setCustomerSyncNotice('กำลังดึงข้อมูลรายชื่อลูกค้าจาก Google Sheets...');
     try {
       const res = await fetchLiveGoogleSheetCustomers(targetUrl);
       if (res.success && res.customers) {
-        const merged = mergeCustomers(customerList, res.customers);
-        setCustomerList(merged);
-        saveCustomers(merged);
-        if (onUpdateCustomers) onUpdateCustomers(merged);
-        setCustomerSyncNotice(`✓ ดึงข้อมูลสำเร็จ! อัปเดต ${res.count} บริษัท`);
+        const finalCusts = mode === 'replace' ? res.customers : mergeCustomers(customerList, res.customers);
+        setCustomerList(finalCusts);
+        saveCustomers(finalCusts);
+        if (onUpdateCustomers) onUpdateCustomers(finalCusts);
+        setCustomerSyncNotice(`✓ ดึงข้อมูลสำเร็จ! อัปเดต ${res.count} บริษัท (${mode === 'replace' ? 'แทนที่ทั้งหมด' : 'รวมข้อมูล'})`);
         setTimeout(() => setCustomerSyncNotice(null), 4000);
       } else {
         setCustomerSyncNotice(`❌ ${res.error || 'ไม่สามารถดึงข้อมูลได้'}`);
