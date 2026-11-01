@@ -28,7 +28,7 @@ import { AccountPlanetLogo } from './AccountPlanetLogo';
 import { CompanySettings, GoogleSheetSyncConfig, FontSizePreference } from '../types';
 import { FontSizeSelector } from './FontSizeSelector';
 
-export type ActiveTab = 'dashboard' | 'vouchers' | 'vault' | 'create_pv' | 'create_rv' | 'wht_report' | 'settings' | 'tax_guide' | 'annual_summary';
+export type ActiveTab = 'dashboard' | 'vouchers' | 'vault' | 'create_pv' | 'create_rv' | 'wht_report' | 'settings' | 'tax_guide' | 'annual_summary' | 'customers';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -297,7 +297,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Navigation Bar */}
       <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18 gap-3">
+        <div className="flex items-center justify-between min-h-[4.75rem] sm:min-h-[5.25rem] py-2 gap-3">
           {/* Brand Logo & Name */}
           <div
             className="flex items-center gap-2 cursor-pointer shrink-0 transition-opacity hover:opacity-95"
@@ -387,20 +387,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>สรุปงบประจำปี</span>
             </button>
 
-            {onOpenCustomerDirectory && (
-              <button
-                type="button"
-                onClick={onOpenCustomerDirectory}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs 2xl:text-sm font-medium whitespace-nowrap transition cursor-pointer text-slate-600 hover:text-blue-700 hover:bg-blue-50/60"
-                title="ฐานข้อมูลรายชื่อลูกค้าและนิติบุคคล ดึงข้อมูลจาก Google Sheets (ACP-รายชื่อลูกค้าทั้งหมด)"
-              >
-                <Building2 className="w-4 h-4 shrink-0 text-blue-600" />
-                <span>รายชื่อลูกค้า</span>
-                <span className="bg-blue-100 text-blue-800 text-[11px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                  {customerCount || 0}
-                </span>
-              </button>
-            )}
+            <button
+              onClick={() => handleSelectTab('customers')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs 2xl:text-sm font-medium whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'customers'
+                  ? 'bg-blue-50 text-blue-700 font-semibold ring-1 ring-blue-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+              title="ฐานข้อมูลรายชื่อลูกค้าและนิติบุคคล ดึงข้อมูลจาก Google Sheets (ACP-รายชื่อลูกค้าทั้งหมด)"
+            >
+              <Building2 className={`w-4 h-4 shrink-0 ${activeTab === 'customers' ? 'text-blue-600' : 'text-slate-500'}`} />
+              <span>รายชื่อลูกค้า</span>
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'customers' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'
+              }`}>
+                {customerCount || 0}
+              </span>
+            </button>
 
             <button
               onClick={() => handleSelectTab('settings')}
@@ -504,6 +507,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             คลังไฟล์แนบ
           </button>
           <button
+            onClick={() => handleSelectTab('customers')}
+            className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap font-medium transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'customers' ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>รายชื่อลูกค้า</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold ${
+              activeTab === 'customers' ? 'bg-blue-700 text-white' : 'bg-blue-200 text-blue-900'
+            }`}>
+              {customerCount || 0}
+            </span>
+          </button>
+          <button
             onClick={() => handleSelectTab('create_pv')}
             className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap font-medium transition cursor-pointer flex items-center gap-1 ${
               activeTab === 'create_pv' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
@@ -563,13 +580,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="bg-white border-b border-slate-200 shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-top duration-200">
             {/* Drawer Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
                   AP
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900 text-sm">{companySettings.name}</div>
-                  <div className="text-xs text-slate-500 font-mono">Tax ID: {companySettings.taxId}</div>
+                  <div className="font-extrabold text-slate-950 text-base sm:text-lg font-prompt leading-snug">{companySettings.name}</div>
+                  <div className="text-xs text-blue-700 font-bold tracking-wide">ACCOUNT PLANET CO., LTD.</div>
+                  <div className="text-[11px] text-slate-500 font-mono mt-0.5">Tax ID: {companySettings.taxId}</div>
                 </div>
               </div>
               <button
@@ -737,28 +755,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
 
-                {onOpenCustomerDirectory && (
-                  <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onOpenCustomerDirectory();
-                    }}
-                    className="flex items-center justify-between p-3 rounded-xl border text-left transition cursor-pointer bg-blue-50/70 border-blue-200 text-blue-900 hover:bg-blue-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-blue-950 font-prompt">ฐานข้อมูลลูกค้า (Google Sheets)</div>
-                        <div className="text-xs text-blue-700">{customerCount} บริษัทในระบบ • ซิงค์สด</div>
-                      </div>
+                <button
+                  onClick={() => handleSelectTab('customers')}
+                  className={`flex items-center justify-between p-3 rounded-xl border text-left transition cursor-pointer ${
+                    activeTab === 'customers'
+                      ? 'bg-blue-50 border-blue-300 text-blue-900 font-semibold ring-1 ring-blue-200'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                      <Building2 className="w-4 h-4" />
                     </div>
-                    <span className="bg-blue-200/80 text-blue-900 text-xs px-2 py-0.5 rounded-full font-bold">
-                      {customerCount}
-                    </span>
-                  </button>
-                )}
+                    <div>
+                      <div className="text-sm font-bold text-slate-900 font-prompt">ฐานข้อมูลรายชื่อลูกค้า (Customer Directory)</div>
+                      <div className="text-xs text-slate-500">{customerCount} บริษัทในระบบ • ซิงค์ Google Sheets</div>
+                    </div>
+                  </div>
+                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                    {customerCount}
+                  </span>
+                </button>
               </div>
 
               {/* Quick Create Buttons Grid */}

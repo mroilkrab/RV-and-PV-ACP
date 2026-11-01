@@ -19,12 +19,12 @@ export const AccountPlanetLogo: React.FC<LogoProps> = ({
 }) => {
   const uid = useId().replace(/:/g, '');
 
-  // Dimension maps
+  // Dimension maps - enlarged and prominent company name
   const dimMap = {
-    sm: { iconH: 'h-8', iconW: 'w-12', textTitle: 'text-xs sm:text-sm', textSub: 'text-[9px]' },
-    md: { iconH: 'h-9 sm:h-10', iconW: 'w-14 sm:w-16', textTitle: 'text-sm sm:text-base', textSub: 'text-[10px] sm:text-xs' },
-    lg: { iconH: 'h-14', iconW: 'w-24', textTitle: 'text-lg', textSub: 'text-xs' },
-    xl: { iconH: 'h-18', iconW: 'w-32', textTitle: 'text-xl', textSub: 'text-sm' },
+    sm: { iconH: 'h-9', iconW: 'w-14', textTitle: 'text-sm sm:text-base font-extrabold', textSub: 'text-[10px] sm:text-[11px]' },
+    md: { iconH: 'h-11 sm:h-12', iconW: 'w-16 sm:w-20', textTitle: 'text-lg sm:text-xl lg:text-2xl font-extrabold', textSub: 'text-[11px] sm:text-xs' },
+    lg: { iconH: 'h-14 sm:h-16', iconW: 'w-24 sm:w-28', textTitle: 'text-xl sm:text-2xl lg:text-3xl font-extrabold', textSub: 'text-xs sm:text-sm' },
+    xl: { iconH: 'h-18 sm:h-20', iconW: 'w-32 sm:w-36', textTitle: 'text-2xl sm:text-3xl lg:text-4xl font-extrabold', textSub: 'text-sm sm:text-base' },
   };
 
   const currentDim = dimMap[size];
@@ -32,7 +32,7 @@ export const AccountPlanetLogo: React.FC<LogoProps> = ({
   // If a custom image URL is provided (and not the default svg path or empty), render the image
   if (customLogoUrl && customLogoUrl.trim().length > 0 && customLogoUrl !== '/account-planet-logo.svg') {
     return (
-      <div className={`flex items-center gap-3 ${className}`}>
+      <div className={`flex items-center gap-3 sm:gap-3.5 ${className}`}>
         <img
           src={customLogoUrl}
           alt="Account Planet Logo"
@@ -41,15 +41,15 @@ export const AccountPlanetLogo: React.FC<LogoProps> = ({
         />
         {showText && (
           <div className="flex flex-col leading-tight">
-            <span className={`font-bold tracking-tight ${isPrint ? 'text-slate-900 text-lg' : 'text-slate-900 ' + currentDim.textTitle} font-prompt`}>
+            <span className={`font-extrabold tracking-tight ${isPrint ? 'text-slate-900 text-xl' : 'text-slate-950 ' + currentDim.textTitle} font-prompt`}>
               บริษัท แอ็คเคาน์ แพลนเน็ท จำกัด
             </span>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`font-semibold tracking-wider ${isPrint ? 'text-slate-600' : 'text-blue-700'} ${currentDim.textSub}`}>
+              <span className={`font-bold tracking-wider ${isPrint ? 'text-slate-600' : 'text-blue-700'} ${currentDim.textSub}`}>
                 ACCOUNT PLANET CO., LTD.
               </span>
               {!hideTaxBadge && (
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap font-mono font-medium">
                   Tax ID: 0105556026458
                 </span>
               )}
@@ -241,23 +241,23 @@ export const AccountPlanetLogo: React.FC<LogoProps> = ({
         <div className="flex flex-col leading-tight">
           <div className="flex items-center gap-1.5">
             <span
-              className={`font-bold tracking-tight ${
-                isPrint ? 'text-slate-900 text-lg' : 'text-slate-900 ' + currentDim.textTitle
-              } font-prompt`}
+              className={`font-extrabold tracking-tight ${
+                isPrint ? 'text-slate-900 text-xl' : 'text-slate-950 ' + currentDim.textTitle
+              } font-prompt leading-tight`}
             >
               บริษัท แอ็คเคาน์ แพลนเน็ท จำกัด
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span
-              className={`font-semibold tracking-wider ${
+              className={`font-bold tracking-wider ${
                 isPrint ? 'text-slate-600' : 'text-blue-700'
               } ${currentDim.textSub}`}
             >
               ACCOUNT PLANET CO., LTD.
             </span>
             {!hideTaxBadge && (
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap font-mono font-medium">
                 Tax ID: 0105556026458
               </span>
             )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Check, 
   ChevronRight, 
@@ -142,36 +142,45 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
     }
   }, [customers]);
 
-  // Filter customers matching query for inline autocomplete
-  const filteredCustomers = customerList.filter((c) => {
-    if (!customerQuery.trim()) return false;
+  // Filter customers matching query for inline autocomplete, or provide top 15 recommendations when query is empty
+  const filteredCustomers = useMemo(() => {
+    if (!customerQuery.trim()) {
+      return customerList.slice(0, 15);
+    }
     const q = customerQuery.trim().toLowerCase();
     const qDigits = q.replace(/[^0-9]/g, '');
-    const matchName = c.name.toLowerCase().includes(q);
-    const matchAddress = c.address.toLowerCase().includes(q);
-    let matchTax = false;
-    if (c.taxId) {
-      const taxDigits = c.taxId.replace(/[^0-9]/g, '');
-      if (qDigits && taxDigits.includes(qDigits)) matchTax = true;
-      else if (c.taxId.toLowerCase().includes(q)) matchTax = true;
-    }
-    return matchName || matchTax || matchAddress;
-  });
+    return customerList.filter((c) => {
+      const matchName = c.name.toLowerCase().includes(q);
+      const matchAddress = c.address ? c.address.toLowerCase().includes(q) : false;
+      const matchContact = c.contactPerson ? c.contactPerson.toLowerCase().includes(q) : false;
+      const matchCode = c.customerCode ? c.customerCode.toLowerCase().includes(q) : false;
+      let matchTax = false;
+      if (c.taxId) {
+        const taxDigits = c.taxId.replace(/[^0-9]/g, '');
+        if (qDigits && taxDigits.includes(qDigits)) matchTax = true;
+        else if (c.taxId.toLowerCase().includes(q)) matchTax = true;
+      }
+      return matchName || matchTax || matchAddress || matchContact || matchCode;
+    });
+  }, [customerList, customerQuery]);
 
   const handleSelectCustomer = (cust: Customer) => {
     setContactName(cust.name);
-    setTaxId(cust.taxId);
-    setAddress(cust.address);
+    setTaxId(cust.taxId || '');
+    setAddress(cust.address || '');
     if (cust.branch) setBranch(cust.branch);
     if (cust.branchCode) setBranchCode(cust.branchCode);
     if (cust.phone) setPhone(cust.phone);
     if (cust.contactPerson) setContactPerson(cust.contactPerson);
-    if (voucherType === 'RV' && !jobClient) {
+    if (voucherType === 'RV') {
       setJobClient(cust.name);
     }
+    setReceivedOrPaidBy(cust.name);
     setCustomerQuery(cust.name);
     setSelectedCustomerSource(cust.source || 'GoogleSheet');
     setIsCustomerDropdownOpen(false);
+    setCustomerSyncNotice(`✓ ดึงข้อมูล "${cust.name}" (เลขนิติบุคคล: ${cust.taxId || 'ไม่ระบุ'}) ลงในฟอร์มเรียบร้อยแล้ว`);
+    setTimeout(() => setCustomerSyncNotice(null), 4000);
   };
 
   const handleQuickSyncCustomerSheet = async () => {
@@ -337,6 +346,80 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
     }
   }, [contactName, editingVoucher]);
 
+  // Helper to get intelligent defaults (description & WHT rate) when an Account Category is chosen
+  const getCategoryDefaults = (category: string, type: VoucherType, contact?: string) => {
+    const cName = contact?.trim() ? ` ${contact.trim()}` : '';
+    switch (category) {
+      case 'ค่าบริการตรวจสอบบัญชี':
+        return {
+          whtRate: 3,
+          description:
+            type === 'RV'
+              ? `รายได้ค่าบริการตรวจสอบบัญชี${cName} ประจำงวดปี 2568 ตามสัญญาบริการวิชาชีพ`
+              : `ค่าบริการตรวจสอบบัญชี${cName} ประจำงวดการตรวจสอบงบการเงิน`,
+        };
+      case 'รายได้ค่าบริการตรวจสอบบัญชี':
+        return {
+          whtRate: 3,
+          description: `รายได้ค่าบริการตรวจสอบบัญชี${cName} ตามสัญญาบริการวิชาชีพ`,
+        };
+      case 'ค่าบริการวิชาชีพบัญชี':
+        return {
+          whtRate: 3,
+          description: `ค่าบริการวิชาชีพบัญชีและจัดทำบัญชีรายเดือน${cName}`,
+        };
+      case 'ค่าที่ปรึกษาธุรกิจและภาษีอากร':
+        return {
+          whtRate: 3,
+          description: `ค่าบริการที่ปรึกษาธุรกิจและวางแผนภาษีอากร${cName}`,
+        };
+      case 'ค่าจ้างเหมาบริการ / ผู้สอบภายนอก':
+        return {
+          whtRate: 3,
+          description: `ค่าจ้างเหมาบริการตรวจสอบบัญชี / ผู้สอบภายนอก${cName}`,
+        };
+      case 'ค่านายหน้า':
+        return {
+          whtRate: 3,
+          description: `ค่านายหน้าและค่าบริการส่งต่องานวิชาชีพ${cName}`,
+        };
+      case 'รายได้ค่าบริการอื่นๆ':
+        return {
+          whtRate: 3,
+          description: `รายได้ค่าบริการวิชาชีพอื่นๆ${cName}`,
+        };
+      case 'ค่าเช่าและสาธารณูปโภค':
+        return {
+          whtRate: 5,
+          description: 'ค่าเช่าอาคารสำนักงานและพื้นที่ประกอบการ',
+        };
+      case 'ค่าธรรมเนียมธนาคารและอื่นๆ':
+        return {
+          whtRate: 0,
+          description: 'ค่าธรรมเนียมการโอนเงินและบริการทางการเงิน',
+        };
+      case 'ค่าเครื่องเขียนและวัสดุสำนักงาน':
+        return {
+          whtRate: 0,
+          description: 'ค่าเครื่องเขียน แบบพิมพ์ และวัสดุสิ้นเปลืองสำนักงาน',
+        };
+      default:
+        if (
+          category.includes('บริการ') ||
+          category.includes('สอบบัญชี') ||
+          category.includes('วิชาชีพ') ||
+          category.includes('จ้าง') ||
+          category.includes('ที่ปรึกษา')
+        ) {
+          return {
+            whtRate: 3,
+            description: `${category}${cName}`,
+          };
+        }
+        return null;
+    }
+  };
+
   // Recalculate item totals
   const updateItemCalculation = (index: number, updates: Partial<VoucherItem>) => {
     setItems((prevItems) => {
@@ -361,17 +444,63 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
     });
   };
 
+  // Automatically update 3% WHT amount and populate description when user selects common account categories
+  const handleAccountCategoryChange = (index: number, newCategory: string) => {
+    const cur = items[index];
+    const base = Number(cur.baseAmount) || 0;
+    const defaults = getCategoryDefaults(newCategory, voucherType, contactName || jobClient);
+
+    const whtRate = defaults !== null ? defaults.whtRate : cur.whtRate;
+    const whtAmount = Math.round(base * (whtRate / 100) * 100) / 100;
+    const vRate = Number(cur.vatRate) || 0;
+    const vatAmount = Math.round(base * (vRate / 100) * 100) / 100;
+    const netAmount = base + vatAmount - whtAmount;
+
+    const updates: Partial<VoucherItem> = {
+      accountCategory: newCategory,
+      whtRate,
+      whtAmount,
+      netAmount,
+    };
+
+    // Auto populate description if current is empty or matches standard default/previous category
+    if (defaults && defaults.description) {
+      const isDefaultOrEmpty =
+        !cur.description ||
+        cur.description.trim() === '' ||
+        cur.description.startsWith('ค่าบริการ') ||
+        cur.description.startsWith('รายได้') ||
+        cur.description.startsWith('ค่าจ้าง') ||
+        cur.description.startsWith('ค่าที่ปรึกษา') ||
+        cur.description.startsWith('ค่านายหน้า') ||
+        cur.description.startsWith('ค่าเช่า');
+      if (isDefaultOrEmpty) {
+        updates.description = defaults.description;
+      }
+    }
+
+    updateItemCalculation(index, updates);
+  };
+
   const addItem = () => {
+    const defaultCat = voucherType === 'RV' ? 'รายได้ค่าบริการตรวจสอบบัญชี' : 'ค่าบริการตรวจสอบบัญชี';
+    const defaults = getCategoryDefaults(defaultCat, voucherType, contactName || jobClient);
+    const base = 10000;
+    const whtRate = defaults ? defaults.whtRate : 3;
+    const whtAmount = Math.round(base * (whtRate / 100) * 100) / 100;
+    const vatRate = voucherType === 'RV' ? 7 : 0;
+    const vatAmount = Math.round(base * (vatRate / 100) * 100) / 100;
+
     const newItem: VoucherItem = {
       id: `item-${Date.now()}`,
-      description: voucherType === 'RV' ? 'รายได้ค่าบริการตรวจสอบบัญชี' : 'ค่าบริการตรวจสอบบัญชี',
-      accountCategory: voucherType === 'RV' ? 'รายได้ค่าบริการตรวจสอบบัญชี' : 'ค่าบริการตรวจสอบบัญชี',
-      baseAmount: 10000,
-      vatRate: voucherType === 'RV' ? 7 : 0,
-      vatAmount: voucherType === 'RV' ? 700 : 0,
-      whtRate: 3,
-      whtAmount: 300,
-      netAmount: voucherType === 'RV' ? 10400 : 9700,
+      description: defaults?.description || (voucherType === 'RV' ? 'รายได้ค่าบริการตรวจสอบบัญชี' : 'ค่าบริการตรวจสอบบัญชี'),
+      accountCategory: defaultCat,
+      baseAmount: base,
+      vatRate,
+      vatAmount,
+      whtRate,
+      whtAmount,
+      netAmount: base + vatAmount - whtAmount,
     };
     setItems([...items, newItem]);
   };
@@ -971,6 +1100,30 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
                 </div>
               )}
 
+              {/* Direct Quick Dropdown Selector */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="text-[11px] font-semibold text-blue-900 shrink-0">
+                  เลือกทันทีจากรายการ:
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const found = customerList.find((c) => c.id === e.target.value);
+                      if (found) handleSelectCustomer(found);
+                    }}
+                    className="w-full px-3 py-2 text-xs bg-white border border-blue-300 rounded-lg text-slate-800 font-medium cursor-pointer shadow-2xs hover:border-blue-400 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- หรือคลิกเลือกจากรายชื่อลูกค้าทั้งหมด ({customerList.length} บริษัท) --</option>
+                    {customerList.map((cust) => (
+                      <option key={cust.id} value={cust.id}>
+                        {cust.customerCode ? `[${cust.customerCode}] ` : ''}{cust.name} {cust.taxId ? `(เลขนิติบุคคล: ${cust.taxId})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Autocomplete Search Input */}
               <div className="relative">
                 <div className="relative flex items-center">
@@ -983,9 +1136,9 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
                       setIsCustomerDropdownOpen(true);
                     }}
                     onFocus={() => {
-                      if (customerQuery.trim()) setIsCustomerDropdownOpen(true);
+                      setIsCustomerDropdownOpen(true);
                     }}
-                    placeholder="🔍 พิมพ์ค้นหา: ชื่อบริษัท (เช่น บางกอก, สยาม, เคมีภัณฑ์) หรือ เลขนิติบุคคล 13 หลัก หรือ ที่อยู่..."
+                    placeholder="🔍 หรือพิมพ์ค้นหา: ชื่อบริษัท (เช่น บางกอก, สยาม), เลขนิติบุคคล 13 หลัก, หรือที่อยู่..."
                     className="w-full pl-9 pr-24 py-2.5 text-xs bg-white border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs text-slate-900 placeholder:text-slate-400 font-medium"
                   />
                   {customerQuery ? (
@@ -1001,59 +1154,104 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
                     </button>
                   ) : (
                     <span className="absolute right-3 text-[10px] text-slate-400 pointer-events-none">
-                      ค้นหาอัตโนมัติ
+                      คลิกเพื่อดูรายการ
                     </span>
                   )}
                 </div>
 
                 {/* Dropdown list of matching customers */}
-                {isCustomerDropdownOpen && customerQuery.trim() && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white rounded-xl shadow-xl border border-slate-200 max-h-72 overflow-y-auto divide-y divide-slate-100">
-                    {filteredCustomers.length > 0 ? (
-                      filteredCustomers.slice(0, 10).map((cust) => (
-                        <div
-                          key={cust.id}
-                          onClick={() => handleSelectCustomer(cust)}
-                          className="p-3 hover:bg-blue-50/80 cursor-pointer transition text-left group"
+                {isCustomerDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-20" 
+                      onClick={() => setIsCustomerDropdownOpen(false)} 
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white rounded-xl shadow-xl border border-blue-200 max-h-80 overflow-y-auto divide-y divide-slate-100">
+                      <div className="p-2.5 bg-blue-50/70 border-b border-blue-100 flex items-center justify-between text-[11px] text-blue-900 font-semibold sticky top-0 z-10">
+                        <span>
+                          {customerQuery.trim()
+                            ? `ผลการค้นหาสำหรับ "${customerQuery}" (พบ ${filteredCustomers.length} บริษัท)`
+                            : `รายชื่อลูกค้าแนะนำ (${customerList.length} บริษัทในระบบ) — คลิกเพื่อดึงข้อมูล`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomerDropdownOpen(false)}
+                          className="text-slate-400 hover:text-slate-700 p-0.5"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-bold text-xs text-slate-900 group-hover:text-blue-700">
-                              {cust.name}
-                            </span>
-                            <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-bold shrink-0">
-                              เลขนิติบุคคล: {cust.taxId}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 truncate mt-1">
-                            {cust.address}
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px] text-slate-400 mt-1">
-                            {cust.branch && <span>สาขา: {cust.branch}</span>}
-                            {cust.phone && <span>โทร: {cust.phone}</span>}
-                            <span className="text-blue-600 font-medium group-hover:underline ml-auto">
-                              คลิกเพื่อเลือกใช้งาน →
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-center text-xs text-slate-500">
-                        <span>ไม่พบข้อมูลลูกค้าที่ตรงกับ &quot;{customerQuery}&quot;</span>
-                        <div className="mt-2 flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setContactName(customerQuery);
-                              setIsCustomerDropdownOpen(false);
-                            }}
-                            className="text-xs text-blue-600 font-medium hover:underline cursor-pointer"
-                          >
-                            ใช้ &quot;{customerQuery}&quot; เป็นชื่อลูกค้าโดยตรง
-                          </button>
-                        </div>
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    )}
-                  </div>
+
+                      {filteredCustomers.length > 0 ? (
+                        filteredCustomers.slice(0, 15).map((cust) => (
+                          <div
+                            key={cust.id}
+                            onClick={() => handleSelectCustomer(cust)}
+                            className="p-3 hover:bg-blue-50 cursor-pointer transition text-left group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {cust.customerCode && (
+                                  <span className="text-[10px] font-mono bg-amber-50 text-amber-800 border border-amber-200 px-1 rounded font-bold shrink-0">
+                                    {cust.customerCode}
+                                  </span>
+                                )}
+                                <span className="font-bold text-xs text-slate-900 group-hover:text-blue-700 truncate">
+                                  {cust.name}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-bold shrink-0">
+                                {cust.taxId ? `เลขนิติบุคคล: ${cust.taxId}` : 'ไม่มีเลขนิติบุคคล'}
+                              </span>
+                            </div>
+                            {cust.address && (
+                              <div className="text-[11px] text-slate-500 truncate mt-1">
+                                {cust.address}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 text-[10px] text-slate-400 mt-1">
+                              {cust.branch && <span>สาขา: {cust.branch}</span>}
+                              {cust.phone && <span>โทร: {cust.phone}</span>}
+                              {cust.assignedStaff && <span>ผู้รับผิดชอบ: {cust.assignedStaff}</span>}
+                              <span className="text-blue-600 font-medium group-hover:underline ml-auto flex items-center gap-0.5">
+                                คลิกดึงข้อมูลลงฟอร์ม →
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-500">
+                          <span>ไม่พบข้อมูลลูกค้าที่ตรงกับ &quot;{customerQuery}&quot;</span>
+                          <div className="mt-2 flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContactName(customerQuery);
+                                setIsCustomerDropdownOpen(false);
+                              }}
+                              className="text-xs text-blue-600 font-medium hover:underline cursor-pointer"
+                            >
+                              ใช้ &quot;{customerQuery}&quot; เป็นชื่อลูกค้าโดยตรง
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center sticky bottom-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCustomerDropdownOpen(false);
+                            setIsCustomerModalOpen(true);
+                          }}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+                        >
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>เปิดดูรายชื่อลูกค้าและนิติบุคคลทั้งหมด ({customerList.length} บริษัท)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -1251,18 +1449,18 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
 
                     {/* Account Category Selector */}
                     <div className="md:col-span-4">
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        หมวดบัญชี <span className="text-rose-500">*</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-slate-700">
+                          หมวดบัญชี <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-blue-700 font-medium">
+                          คำนวณหัก 3% &amp; ใส่คำอธิบายอัตโนมัติ
+                        </span>
+                      </div>
                       <select
                         value={item.accountCategory}
-                        onChange={(e) => {
-                          const cat = e.target.value;
-                          updateItemCalculation(index, {
-                            accountCategory: cat,
-                          });
-                        }}
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
+                        onChange={(e) => handleAccountCategoryChange(index, e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-blue-300 bg-blue-50/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-900 cursor-pointer"
                       >
                         {categoriesToUse.map((c) => (
                           <option key={c} value={c}>
@@ -1313,9 +1511,16 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
 
                     {/* Withholding Tax WHT */}
                     <div className="sm:col-span-3">
-                      <label className="block text-[11px] font-medium text-amber-800 mb-1">
-                        ภาษีหัก ณ ที่จ่าย (WHT)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-medium text-amber-900">
+                          ภาษีหัก ณ ที่จ่าย (WHT)
+                        </label>
+                        {item.whtRate === 3 && (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-bold">
+                            3% อัตโนมัติ
+                          </span>
+                        )}
+                      </div>
                       <select
                         value={item.whtRate}
                         onChange={(e) =>
@@ -1323,14 +1528,14 @@ export const VoucherWizardForm: React.FC<VoucherWizardFormProps> = ({
                         }
                         className="w-full px-2 py-1.5 text-xs border border-amber-300 rounded-lg bg-amber-50 text-amber-900 font-medium"
                       >
-                        <option value={3}>หัก 3% (บริการ/สอบบัญชี/นายหน้า)</option>
+                        <option value={3}>หัก 3% (บริการ/สอบบัญชี/วิชาชีพ)</option>
                         <option value={1}>หัก 1% (ค่าขนส่ง)</option>
                         <option value={2}>หัก 2% (ค่าโฆษณา)</option>
                         <option value={5}>หัก 5% (ค่าเช่า)</option>
                         <option value={0}>ไม่หักภาษี (0%)</option>
                       </select>
                       <div className="text-right font-mono text-[11px] text-amber-800 font-bold mt-1">
-                        -{formatCurrency(item.whtAmount)} บาท
+                        -{formatCurrency(item.whtAmount)} บาท ({item.whtRate}%)
                       </div>
                     </div>
 

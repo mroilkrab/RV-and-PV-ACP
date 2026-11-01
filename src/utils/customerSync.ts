@@ -135,9 +135,36 @@ export function parseCSVToCustomers(csvTextOrRows: string | string[][]): Custome
     rows = csvTextOrRows;
   }
 
-  if (!rows || rows.length < 2) return [];
+  if (!rows || rows.length === 0) return [];
 
-  const headers = rows[0].map((h) => String(h || '').toLowerCase().trim().replace(/[\s\-_.]+/g, ''));
+  // 1. Detect header row by scanning first 10 rows
+  let headerRowIndex = -1;
+  let headers: string[] = [];
+
+  const nameKeywords = ['ชื่อบริษัท', 'ชื่อลูกค้า', 'บริษัท', 'ลูกค้า', 'companyname', 'customername', 'company', 'customer'];
+  const taxKeywords = ['เลขทะเบียนนิติบุคคล', 'เลขนิติบุคคล', 'เลขผู้เสียภาษี', 'เลขประจำตัวผู้เสียภาษี', 'ทะเบียนนิติบุคคล', 'taxid', 'regno', 'taxno', 'registrationnumber'];
+  const addressKeywords = ['ที่อยู่ตามภพ20', 'ที่อยู่สำนักงาน', 'ที่อยู่บริษัท', 'ที่อยู่', 'address', 'location'];
+  const codeKeywords = ['รหัสลูกค้า', 'รหัส', 'code', 'customercode', 'custcode'];
+
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const candidate = (rows[i] || []).map((h) => String(h || '').toLowerCase().trim().replace(/[\s\-_.]+/g, ''));
+    let matches = 0;
+    if (candidate.some((c) => nameKeywords.some((k) => c.includes(k.replace(/[\s\-_.]+/g, ''))))) matches++;
+    if (candidate.some((c) => taxKeywords.some((k) => c.includes(k.replace(/[\s\-_.]+/g, ''))))) matches++;
+    if (candidate.some((c) => addressKeywords.some((k) => c.includes(k.replace(/[\s\-_.]+/g, ''))))) matches++;
+    if (candidate.some((c) => codeKeywords.some((k) => c.includes(k.replace(/[\s\-_.]+/g, ''))))) matches++;
+    if (matches >= 2) {
+      headerRowIndex = i;
+      headers = candidate;
+      break;
+    }
+  }
+
+  // If no header row was detected by keywords, default to row 0
+  if (headerRowIndex === -1 && rows.length > 0) {
+    headerRowIndex = 0;
+    headers = (rows[0] || []).map((h) => String(h || '').toLowerCase().trim().replace(/[\s\-_.]+/g, ''));
+  }
 
   const findCol = (keywords: string[]): number => {
     return headers.findIndex((h) => 
@@ -145,20 +172,42 @@ export function parseCSVToCustomers(csvTextOrRows: string | string[][]): Custome
     );
   };
 
-  const idxCode = findCol(['รหัสลูกค้า', 'รหัส', 'code', 'customercode', 'custcode', 'id']);
-  const idxName = findCol(['ชื่อบริษัท', 'ชื่อลูกค้า', 'บริษัท', 'ลูกค้า', 'ชื่อ', 'customername', 'companyname', 'company', 'customer', 'name']);
-  const idxTaxId = findCol(['เลขทะเบียนนิติบุคคล', 'เลขนิติบุคคล', 'เลขผู้เสียภาษี', 'เลขประจำตัวผู้เสียภาษี', 'ทะเบียนนิติบุคคล', 'taxid', 'regno', 'taxno', 'registrationnumber', 'tax']);
-  const idxAddress = findCol(['ที่อยู่ตามภพ20', 'ที่อยู่สำนักงาน', 'ที่อยู่บริษัท', 'ที่อยู่', 'address', 'officeaddress', 'location']);
-  const idxStaff = findCol(['ผู้ส่งงาน', 'พนักงานผู้รับผิดชอบ', 'ผู้รับผิดชอบ', 'ผู้ส่ง', 'staff', 'assignedstaff', 'pic']);
-  const idxBranch = findCol(['สาขา', 'branch', 'สำนักงาน']);
-  const idxBranchCode = findCol(['รหัสสาขา', 'branchcode']);
-  const idxPhone = findCol(['เบอร์โทร', 'เบอร์โทรศัพท์', 'โทรศัพท์', 'โทร', 'phone', 'tel', 'mobile', 'telephone']);
-  const idxEmail = findCol(['อีเมล', 'email', 'e-mail', 'mail']);
-  const idxContactPerson = findCol(['ผู้ติดต่อ', 'ชื่อผู้ติดต่อ', 'ติดต่อ', 'contactperson', 'contact', 'attn']);
+  let idxCode = findCol(['รหัสลูกค้า', 'รหัส', 'code', 'customercode', 'custcode', 'id']);
+  let idxName = findCol(['ชื่อบริษัท', 'ชื่อลูกค้า', 'บริษัท', 'ลูกค้า', 'ชื่อ', 'customername', 'companyname', 'company', 'customer', 'name']);
+  let idxTaxId = findCol(['เลขทะเบียนนิติบุคคล', 'เลขนิติบุคคล', 'เลขผู้เสียภาษี', 'เลขประจำตัวผู้เสียภาษี', 'ทะเบียนนิติบุคคล', 'taxid', 'regno', 'taxno', 'registrationnumber', 'tax']);
+  let idxAddress = findCol(['ที่อยู่ตามภพ20', 'ที่อยู่สำนักงาน', 'ที่อยู่บริษัท', 'ที่อยู่', 'address', 'officeaddress', 'location']);
+  let idxStaff = findCol(['ผู้ส่งงาน', 'พนักงานผู้รับผิดชอบ', 'ผู้รับผิดชอบ', 'ผู้ส่ง', 'staff', 'assignedstaff', 'pic']);
+  let idxBranch = findCol(['สาขา', 'branch', 'สำนักงาน']);
+  let idxBranchCode = findCol(['รหัสสาขา', 'branchcode']);
+  let idxPhone = findCol(['เบอร์โทร', 'เบอร์โทรศัพท์', 'โทรศัพท์', 'โทร', 'phone', 'tel', 'mobile', 'telephone']);
+  let idxEmail = findCol(['อีเมล', 'email', 'e-mail', 'mail']);
+  let idxContactPerson = findCol(['ผู้ติดต่อ', 'ชื่อผู้ติดต่อ', 'ติดต่อ', 'contactperson', 'contact', 'attn']);
+
+  // If idxName wasn't found by header text, intelligently deduce columns from data rows!
+  if (idxName === -1 && rows.length > headerRowIndex + 1) {
+    const sampleRows = rows.slice(headerRowIndex + 1, headerRowIndex + 6);
+    const colCount = rows[headerRowIndex]?.length || 0;
+    for (let c = 0; c < colCount; c++) {
+      const colValues = sampleRows.map((r) => String(r[c] || '').trim());
+      if (idxName === -1 && colValues.some((v) => v.includes('บริษัท') || v.includes('บจก') || v.includes('หจก') || v.includes('บมจ') || v.includes('ห้างหุ้นส่วน'))) {
+        idxName = c;
+      }
+      if (idxTaxId === -1 && colValues.some((v) => cleanTaxId(v).length === 13)) {
+        idxTaxId = c;
+      }
+      if (idxAddress === -1 && colValues.some((v) => v.includes('ตำบล') || v.includes('อำเภอ') || v.includes('จังหวัด') || v.includes('แขวง') || v.includes('เขต') || v.includes('ถนน') || v.includes('ซอย') || v.includes('หมู่'))) {
+        idxAddress = c;
+      }
+      if (idxCode === -1 && colValues.some((v) => /^ACP-\d+/i.test(v))) {
+        idxCode = c;
+      }
+    }
+    if (idxName === -1) idxName = colCount > 1 ? 1 : 0;
+  }
 
   const customers: Customer[] = [];
 
-  for (let r = 1; r < rows.length; r++) {
+  for (let r = headerRowIndex + 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.length === 0 || row.every((c) => !c || String(c).trim() === '')) continue;
 

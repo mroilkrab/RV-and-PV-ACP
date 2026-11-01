@@ -34,6 +34,7 @@ import {
   pushAllCustomersToFirebase,
 } from './utils/customerSync';
 import { CustomerDirectoryModal } from './components/CustomerDirectoryModal';
+import { CustomerDirectoryView } from './components/CustomerDirectoryView';
 import { 
   saveBackupToIndexedDb, 
   getLatestBackupFromIndexedDb 
@@ -850,7 +851,7 @@ export default function App() {
             onOpenFirebaseSyncModal={() => setIsFirebaseSyncModalOpen(true)}
             onOpenAccountingExportModal={() => setIsAccountingExportModalOpen(true)}
             isCloudConnected={isCloudConnected}
-            onOpenCustomerDirectory={() => setIsCustomerDirectoryOpen(true)}
+            onOpenCustomerDirectory={() => setActiveTab('customers')}
             customerCount={customers.length}
           />
         </div>
@@ -954,7 +955,7 @@ export default function App() {
                 onRemoveSampleDataOnly={handleRemoveSampleDataOnly}
                 onOpenFirebaseSyncModal={() => setIsFirebaseSyncModalOpen(true)}
                 onOpenAccountingExportModal={() => setIsAccountingExportModalOpen(true)}
-                onOpenCustomerDirectory={() => setIsCustomerDirectoryOpen(true)}
+                onOpenCustomerDirectory={() => setActiveTab('customers')}
                 customerCount={customers.length}
               />
             )}
@@ -1097,6 +1098,19 @@ export default function App() {
                   setEditingVoucher(null);
                   setActiveTab('create_pv');
                 }}
+              />
+            )}
+
+            {/* 10. Customer Directory Master Tab (ฐานข้อมูลรายชื่อลูกค้าและนิติบุคคล) */}
+            {activeTab === 'customers' && (
+              <CustomerDirectoryView
+                customers={customers}
+                onUpdateCustomers={handleUpdateCustomers}
+                customerSheetConfig={customerSheetConfig}
+                onUpdateSheetConfig={handleUpdateCustomerSheetConfig}
+                onCreateRVWithCustomer={handleCreateRVWithCustomer}
+                onCreatePVWithCustomer={handleCreatePVWithCustomer}
+                showToast={showToast}
               />
             )}
           </>

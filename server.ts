@@ -22,18 +22,31 @@ async function startServer() {
 
       let targetUrl = '';
       if (url && typeof url === 'string') {
-        // Extract Sheet ID from URL if provided
-        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        if (match && match[1]) {
-          const id = match[1];
-          targetUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
-          if (sheetName) {
-            targetUrl += `&sheet=${encodeURIComponent(String(sheetName))}`;
-          }
-        } else if (url.includes('format=csv') || url.includes('output=csv')) {
-          targetUrl = url;
+        const trimmedUrl = url.trim();
+        // Handle published web sheets: /pubhtml -> /pub?output=csv
+        if (trimmedUrl.includes('/pubhtml')) {
+          targetUrl = trimmedUrl.replace('/pubhtml', '/pub?output=csv');
+        } else if (trimmedUrl.includes('/pub?')) {
+          targetUrl = trimmedUrl.includes('output=csv') ? trimmedUrl : `${trimmedUrl}&output=csv`;
         } else {
-          targetUrl = url;
+          // Extract Sheet ID from URL if provided
+          const match = trimmedUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+          if (match && match[1]) {
+            const id = match[1];
+            targetUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+            // Check for specific sheet tab gid
+            const gidMatch = trimmedUrl.match(/[#&?]gid=([0-9]+)/);
+            if (gidMatch && gidMatch[1]) {
+              targetUrl += `&gid=${gidMatch[1]}`;
+            }
+            if (sheetName) {
+              targetUrl += `&sheet=${encodeURIComponent(String(sheetName))}`;
+            }
+          } else if (trimmedUrl.includes('format=csv') || trimmedUrl.includes('output=csv')) {
+            targetUrl = trimmedUrl;
+          } else {
+            targetUrl = trimmedUrl;
+          }
         }
       } else if (sheetId && typeof sheetId === 'string') {
         targetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
@@ -54,11 +67,19 @@ async function startServer() {
 
       if (!response.ok) {
         return res.status(response.status).json({
-          error: `Google Sheets responded with status ${response.status}. กรุณาตรวจสอบว่าชีตได้รับการตั้งค่าเป็น "ทุกคนที่มีลิงก์มีสิทธิ์ดู" (Anyone with the link can view)`,
+          error: `Google Sheets ตอบกลับรหัสสถานะ ${response.status}. กรุณาตรวจสอบว่าชีตได้รับการตั้งค่าการแชร์เป็น "ทุกคนที่มีลิงก์มีสิทธิ์ดู" (Anyone with the link can view)`,
         });
       }
 
       const csvData = await response.text();
+
+      // Detect if Google returned an HTML login / permission page
+      if (csvData.trim().startsWith('<!DOCTYPE html') || csvData.trim().startsWith('<html') || csvData.includes('accounts.google.com')) {
+        return res.status(403).json({
+          error: 'ชีตนี้ถูกตั้งค่าเป็นส่วนตัว (Private) ไม่สามารถเข้าถึงได้ กรุณาตั้งค่าการแชร์ใน Google Sheets เป็น "ทุกคนที่มีลิงก์มีสิทธิ์ดู" (Anyone with the link can view)',
+        });
+      }
+
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       return res.send(csvData);
     } catch (err: any) {
