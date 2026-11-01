@@ -1,0 +1,7 @@
+{
+  "name": "ระบบใบสำคัญรับ-จ่าย Live Artifacts (Account Planet)",
+  "description": "ระบบจัดการและจัดเก็บใบสำคัญรับ (RV) และใบสำคัญจ่าย (PV) แบบ Live Artifacts พร้อมแดชบอร์ดสรุปงบการเงินรายปี (Annual Summary) คำนวณรายได้ ค่าใช้จ่าย กำไรสุทธิ ภาษีหัก ณ ที่จ่าย ภ.ง.ด. 3/53 และพิมพ์เอกสาร A4 ตามมาตรฐานสรรพากร",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

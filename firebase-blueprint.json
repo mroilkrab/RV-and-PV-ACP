@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "Voucher": {
+      "title": "Voucher",
+      "description": "Accounting voucher document representing Receive (RV) or Payment (PV) transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique voucher identifier" },
+        "type": { "type": "string", "description": "Voucher type: RV or PV" },
+        "voucherNumber": { "type": "string", "description": "Formatted document number" },
+        "date": { "type": "string", "description": "Document date (YYYY-MM-DD)" },
+        "status": { "type": "string", "description": "Voucher status" },
+        "totalAmount": { "type": "number", "description": "Total voucher transaction amount" },
+        "updatedAt": { "type": "string", "description": "Timestamp of last modification" }
+      },
+      "required": ["id", "type", "voucherNumber", "date", "status"]
+    },
+    "CompanySettings": {
+      "title": "CompanySettings",
+      "description": "Company profile, bank accounts, document numbering sequences, and security settings",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Company or business name" },
+        "taxId": { "type": "string", "description": "13-digit Tax identification number" },
+        "updatedAt": { "type": "string", "description": "Timestamp of last update" }
+      },
+      "required": ["name", "taxId"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Company client or partner directory master with 13-digit tax ID and address",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique customer identifier" },
+        "name": { "type": "string", "description": "Company name or client name" },
+        "taxId": { "type": "string", "description": "13-digit legal tax registration number" },
+        "address": { "type": "string", "description": "Registered company address" },
+        "branch": { "type": "string", "description": "Branch name or head office" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "updatedAt": { "type": "string", "description": "Timestamp of last modification" }
+      },
+      "required": ["id", "name", "taxId", "address"]
+    }
+  },
+  "firestore": {
+    "/vouchers/{voucherId}": {
+      "schema": "Voucher",
+      "description": "Collection of accounting vouchers"
+    },
+    "/settings/{settingId}": {
+      "schema": "CompanySettings",
+      "description": "Application settings and company configuration"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Collection of company clients synced from Google Sheets and system"
+    }
+  }
+}

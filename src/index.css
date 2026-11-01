@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-prompt: 'Prompt', 'Noto Sans Thai', 'Sarabun', sans-serif;
+  --font-sarabun: 'Sarabun', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    font-family: 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 17.5px; /* เพิ่มขนาดตัวอักษรตั้งต้นให้อ่านง่าย สบายตา ชัดเจนยิ่งขึ้น */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transition: font-size 0.15s ease-in-out;
+  }
+
+  /* เลือกระดับขนาดตัวอักษรได้ตามต้องการ */
+  html[data-font-size="compact"] {
+    font-size: 15px; /* กะทัดรัด */
+  }
+
+  html[data-font-size="normal"] {
+    font-size: 16px; /* มาตรฐาน */
+  }
+
+  html[data-font-size="large"] {
+    font-size: 17.5px; /* ใหญ่ สบายตา (ค่าเริ่มต้นแนะนำ) */
+  }
+
+  html[data-font-size="xlarge"] {
+    font-size: 19.5px; /* ใหญ่พิเศษ */
+  }
+
+  body {
+    font-family: 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+  }
+
+  /* Prevent Thai text clipping and overflow */
+  p, span, label, td, th {
+    overflow-wrap: break-word;
+  }
+
+  input, select, textarea, button {
+    font-family: inherit;
+  }
+
+  /* Financial numbers alignment */
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+
+  html {
+    font-size: 15px !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: 'Sarabun', serif !important;
+    font-size: 11pt;
+    line-height: 1.45;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-container {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+

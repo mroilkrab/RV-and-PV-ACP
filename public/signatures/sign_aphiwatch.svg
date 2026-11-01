@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 320" fill="none">
+  <defs>
+    <filter id="ink-texture" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.4" result="blur" />
+      <feMerge>
+        <feMergeNode in="SourceGraphic" />
+        <feMergeNode in="blur" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Blue ink handwritten signature of Aphiwatch faithfully rendered from upload -->
+  <g filter="url(#ink-texture)" stroke="#0b2e8a" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Initial "am" cursive stroke -->
+    <!-- The "a" loop -->
+    <path
+      d="M 68 288
+         C 88 230, 126 142, 148 114
+         C 162 96, 172 108, 164 136
+         C 152 178, 120 226, 102 248
+         C 90 262, 80 264, 82 246
+         C 86 210, 114 162, 144 148
+         C 166 138, 178 152, 174 186
+         C 168 238, 182 284, 196 284
+         C 206 284, 218 250, 226 218
+         C 236 178, 252 188, 254 220
+         C 256 256, 274 278, 286 264
+         C 300 248, 318 206, 328 178
+         C 336 156, 350 170, 344 196
+         C 338 222, 332 248, 340 252
+         C 350 256, 376 226, 402 188"
+      stroke-width="12.5"
+    />
+
+    <!-- The bold cursive "S" stroke -->
+    <path
+      d="M 436 242
+         C 434 238, 442 226, 458 198
+         C 488 146, 524 88, 560 72
+         C 584 62, 608 72, 614 96
+         C 618 114, 610 134, 584 160
+         C 544 198, 492 232, 474 246
+         C 454 262, 442 268, 436 266
+         C 426 262, 434 252, 456 244
+         C 490 232, 532 238, 564 252
+         C 582 260, 592 264, 604 262"
+      stroke-width="13"
+    />
+
+    <!-- The diagonal slash stroke "/" on the right -->
+    <path
+      d="M 654 244
+         C 666 228, 706 176, 746 124
+         C 760 106, 768 96, 774 92"
+      stroke-width="12.5"
+    />
+  </g>
+</svg>

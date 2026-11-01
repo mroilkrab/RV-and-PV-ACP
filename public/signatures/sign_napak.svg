@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 460" fill="none">
+  <defs>
+    <!-- Subtle ink variation filter to give genuine pen look -->
+    <filter id="ink-bleed" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur stdDeviation="0.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="SourceGraphic" />
+        <feMergeNode in="blur" />
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Smooth organic path faithfully capturing the cursive handwritten strokes -->
+  <path
+    d="M 235 185
+       C 175 190, 115 235, 112 300
+       C 110 345, 140 385, 185 385
+       C 225 385, 252 345, 252 290
+       C 252 245, 230 205, 205 210
+       C 180 215, 165 245, 160 275
+       C 155 315, 175 350, 205 375
+       C 225 390, 260 365, 275 305
+       C 300 205, 335 90, 360 52
+       C 372 32, 385 45, 380 75
+       C 370 145, 320 315, 305 405
+       C 300 425, 305 435, 315 430
+       C 335 410, 365 310, 395 215
+       C 405 185, 415 190, 410 220
+       C 400 270, 385 340, 385 385
+       C 385 415, 400 425, 415 415
+       C 435 395, 470 260, 500 135
+       C 515 70, 528 42, 542 45
+       C 552 48, 552 75, 542 120
+       C 525 200, 495 330, 485 410
+       C 480 435, 492 445, 505 430
+       C 525 405, 550 340, 565 295
+       C 572 275, 585 270, 582 290
+       C 575 330, 560 380, 555 405
+       C 550 425, 560 432, 575 420
+       C 605 390, 665 270, 715 175
+       C 730 145, 750 110, 758 98"
+    stroke="#0944bc"
+    stroke-width="11"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#ink-bleed)"
+  />
+  
+  <!-- Subtle accent flourish cross / dot in blue pen -->
+  <path
+    d="M 368 250
+       C 380 275, 395 310, 410 335
+       C 415 345, 410 350, 402 342
+       C 390 325, 375 285, 365 258"
+    stroke="#0944bc"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
